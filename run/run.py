@@ -14,8 +14,7 @@ import pickle
 from modules.load import DataLoader
 from modules.clean import DataCleaner
 from modules.validation import DataPartitioner
-# from modules.featurizing3 import transform
-from modules.featurizing2 import Featurizer
+from modules.featurizing import Featurizer
 from modules.hypertuning import Hypertuner
 
 def main():
