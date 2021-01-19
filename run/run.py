@@ -107,9 +107,11 @@ def main():
     predictions_NN = best_model_NN.predict(test_set)
 
     # save RF to disk
-            {}.sav.format(str(best_model))
+    pickle.dump(best_model_RF open(os.path.join(run_folder, 'logs', 'best_model_RF_sellingprice{}.sav'.format(str(best_model_RF))), 'wb')
 
     # save NN to disk
+    pickle.dump(best_model_NN open(os.path.join(run_folder, 'logs', 'best_model_RF_sellingprice{}.sav'.format(str(best_model_NN))), 'wb'))
+
 
 
     # calculate accuracy and build plots

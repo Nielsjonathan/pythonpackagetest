@@ -11,7 +11,7 @@ setup(
         "numpy",
         "matplotlib",
         "plotnine",
-        "scikit-learn"
+        "scikit-learn",
         "pyarrow"
     ],
     python_requires="==3.8.5"
