@@ -14,6 +14,7 @@ import pickle
 from modules.load import DataLoader
 from modules.clean import DataCleaner
 from modules.validation import DataPartitioner
+# from modules.featurizing3 import transform
 from modules.featurizing2 import Featurizer
 from modules.hypertuning import Hypertuner
 
@@ -63,37 +64,59 @@ def main():
     validation_mapping.to_feather(os.path.join(run_folder, "prepared", "validation_mapping.feather"))
 
     #featurize the data
-    featurized_data = Featurizer(houses).fit_transform(houses)
+    featurized_data = Featurizer(houses).transform(houses, codes, services, infrastructure, leisure)
+    # featurized_data = transform(houses, codes, services, infrastructure, leisure)
     featurized_data.reset_index(drop=True).to_feather(os.path.join(run_folder, "prepared", "features.feather"))
 
-    #hypertuning the model
+    #hypertuning the model 
     train_set = featurized_data.merge(validation_mapping.query("test == False")[['globalId', 'cv_split']])
+    
     hypertuner_rf = Hypertuner(estimator = RandomForestRegressor(random_state=1234),
     tuning_params = conf["training_params"]["hypertuning"]["RF_params"],
     validation_mapping = validation_mapping)
 
-    '''hypertuner_NN = Hypertuner(estimator = MLPRegressor(random_state=1234),
-    tuning_params = conf["training_params"]["hypertuning"]["RF_params"],
-    validation_mapping = validation_mapping)'''
+    hypertuner_NN = Hypertuner(estimator = MLPRegressor(random_state=1234),
+    tuning_params = conf["training_params"]["hypertuning"]["NN_params"],
+    validation_mapping = validation_mapping)
 
-    #model
+    #model RF
     #train_set = featurized_data.merge(validation_mapping.query("test == False")[['globalId', 'cv_split']])
-    best_model, best_model_params = hypertuner_rf.tune_model(train_set)
-    # best_parameters = 
-    # log best parameters  
-    with open(os.path.join(run_folder, 'logs', 'best_model_params_RF_sellingprice.txt'), 'w') as f:
-        f.write(json.dumps(best_model_params))
+    best_model_RF, best_model_params_RF = hypertuner_rf.tune_model(train_set)
 
-    # predict on test set
+    #model NN
+    best_model_NN, best_model_params_NN = hypertuner_NN.tune_model(train_set)
+
+    # log best parameters RF
+    with open(os.path.join(run_folder, 'logs', 'best_model_params_RF_sellingprice.txt'), 'w') as f:
+        f.write(json.dumps(best_model_params_RF))
+
+    # log best parameters NN
+    with open(os.path.join(run_folder, 'logs', 'best_model_params_NN_sellingprice.txt'), 'w') as f:
+        f.write(json.dumps(best_model_params_NN))
+
+    # predict on test set with RF
     test_set = featurized_data.merge(validation_mapping.query("test == True")[['globalId', 'cv_split']])
     truth = test_set.sellingPrice
-    test_set = test_set.drop(columns=['sellingPrice', 'globalId', 'cv_split'])
-    predictions_RF = best_model.predict(test_set)
+    test_set.drop(columns=['sellingPrice', 'globalId', 'cv_split'], inplace = True) 
+    predictions_RF = best_model_RF.predict(test_set)
+
+    # predict on test set with NN
+    test_set = featurized_data.merge(validation_mapping.query("test == True")[['globalId', 'cv_split']])
+    truth = test_set.sellingPrice
+    test_set.drop(columns=['sellingPrice', 'globalId', 'cv_split'], inplace = True) 
+    predictions_NN = best_model_NN.predict(test_set)
+
+    # save RF to disk
+            {}.sav.format(str(best_model))
+
+    # save NN to disk
+
 
     # calculate accuracy and build plots
     # calculate rmse on test set using predictions_test and actuals
     rmse_test = None # filled
     # other accuracy measures like MAE enz
+
 
     # build plots actuals vs predicted
 

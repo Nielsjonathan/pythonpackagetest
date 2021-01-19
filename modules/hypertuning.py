@@ -25,7 +25,7 @@ class Hypertuner(object):
         for i in splits:
             train_split = train_set.query(f"cv_split != {i}")
             X_train = train_split.drop(['globalId', 'sellingPrice', 'cv_split'],axis=1)
-            print(X_train.columns)
+            # print(X_train.columns)
             y_train = train_split['sellingPrice']
             estimator_cv.fit(X=X_train, y = y_train)
             # evaluate the model on split 1
@@ -84,10 +84,12 @@ class Hypertuner(object):
         # get the best parameter combo out of the lot
         #best_parameters = {'n_estimators': 40, 'max_depth': 12} # needs to be replaced with the best parameter combo i.e. with smallers cv error value
 
+        train_set_model = train_set.drop(columns=['sellingPrice', 'globalId', 'cv_split'])
+
         # train the best model on all train set
         final_estimator = deepcopy(self.estimator)
         final_estimator = self.estimator.set_params(**best_parameters)
-        final_estimator.fit(X=train_set, y=train_set[self.target]) # check that the columns are righjt
+        final_estimator.fit(X=train_set_model, y=train_set[self.target]) # check that the columns are righjt
         return final_estimator, best_parameters
 
 

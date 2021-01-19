@@ -12,7 +12,8 @@ class Featurizer(TransformerFitter):
     def __init__(self, houses):
         self.houses = houses
 
-    def transform(self, houses):
+    def transform(self, houses, codes, services, infrastructure, leisure):
+
 
         # dummy code categoryObject
         houses = pd.get_dummies(houses, columns = ['categoryObject'])

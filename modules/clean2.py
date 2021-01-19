@@ -45,10 +45,6 @@ class DataCleaner(object):
         houses['publicationDate'] = pd.to_datetime(houses['publicationDate'])
         houses['signDate'] = pd.to_datetime(houses['signDate'])
 
-        # fill parcel with livingarea when nan
-        houses.parcel.fillna(houses.livingArea, inplace = True)
-
-
         ######## CLEAN CODES ############
 
         # Deleting the collumn huisnummer
@@ -218,6 +214,29 @@ class DataCleaner(object):
         leisure['Vrije tijd en cultuur/Bioscoop/Aantal bioscopen/Binnen 20 km (aantal)'] = leisure['Vrije tijd en cultuur/Bioscoop/Aantal bioscopen/Binnen 20 km (aantal)'].replace(np.NaN, leisure['Vrije tijd en cultuur/Bioscoop/Aantal bioscopen/Binnen 20 km (aantal)'].mean())
 
 
-        return houses, codes, services, infrastructure, leisure 
+        #### combining the datasets ######
+        #Merge houses with codes
+        houses_codes = pd.merge(houses, codes, how='left', left_on='zipcode', right_on='PC6')
+        #Remove data records that did not match with codes
+        houses_codes = houses_codes[houses_codes['PC6'].notna()]
+
+        #### merge feature_codes with services 
+        houses_codes_services = pd.merge(houses_codes, services, how='left', left_on='Buurt2018', right_on='Codering_3')
+
+        #### merge feature_codes_services with infrastructure
+        houses_codes_services_infrastructure = pd.merge(houses_codes_services, infrastructure, how='left', left_on='Codering_3', right_on='coding')
+
+        #### merge houses_codes_services_infrastructure with leisure
+        houses_cbs = pd.merge(houses_codes_services_infrastructure, leisure, how='left', left_on='Codering_3', right_on='coding')
+
+        # removing letters from zipcode 
+        houses_cbs['zipcode'] = [i[:4] for i in houses_cbs['zipcode']]
+        # change to numeric value
+        houses_cbs['zipcode'] = pd.to_numeric(houses_cbs['zipcode'])
+
+
+
+
+        return houses, codes, services, infrastructure, leisure, houses_cbs
     
 #self = DataCleaner()
