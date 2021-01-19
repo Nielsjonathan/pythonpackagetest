@@ -111,19 +111,26 @@ def main():
     # save NN to disk
     pickle.dump(best_model_NN, open(os.path.join(run_folder, 'models', 'best_model_NN_sellingprice{}.sav'.format(str(best_model_NN))), 'wb'))
 
+    # accuracy metrics RF
+    mean_dif_RF = predictions_RF / truth * 100 - 100
+    np.mean(mean_dif_RF)
+
+    # accuracy metrics NN
+    mean_dif_NN = predictions_NN / truth * 100 - 100
+    np.mean(mean_dif_NN)
 
 
-    # calculate accuracy and build plots
-    # calculate rmse on test set using predictions_test and actuals
-    rmse_test = None # filled
-    # other accuracy measures like MAE enz
+    # # calculate accuracy and build plots
+    # # calculate rmse on test set using predictions_test and actuals
+    # rmse_test = None # filled
+    # # other accuracy measures like MAE enz
 
 
-    # build plots actuals vs predicted
+    # # build plots actuals vs predicted
 
-    # save to disk best_model as pickle in model folder, accuracy metrics
+    # # save to disk best_model as pickle in model folder, accuracy metrics
 
-    # in log folder, plots in log folder
+    # # in log folder, plots in log folder
 
     print('Pipeline completed')
 
