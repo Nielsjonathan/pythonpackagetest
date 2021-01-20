@@ -8,7 +8,12 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 import pickle
+from matplotlib import pyplot as plt
+import warnings 
+warnings.filterwarnings('ignore')
+
 
 #importing our modules
 from modules.load import DataLoader
@@ -78,6 +83,8 @@ def main():
     tuning_params = conf["training_params"]["hypertuning"]["NN_params"],
     validation_mapping = validation_mapping)
 
+    print('Training models')
+
     #model RF
     #train_set = featurized_data.merge(validation_mapping.query("test == False")[['globalId', 'cv_split']])
     best_model_RF, best_model_params_RF = hypertuner_rf.tune_model(train_set)
@@ -112,8 +119,24 @@ def main():
     pickle.dump(best_model_NN, open(os.path.join(run_folder, 'models', 'best_model_NN_sellingprice{}.sav'.format(str(best_model_NN))), 'wb'))
 
     # accuracy metrics RF
-    mean_dif_RF = predictions_RF / truth * 100 - 100
-    np.mean(mean_dif_RF)
+    #mean percentage difference between truth and prediction
+    dif_RF = predictions_RF / truth * 100 - 100
+    mean_dif_RF = np.mean(dif_RF)
+    mean_dif_RF_result = str(mean_dif_RF)
+    with open(os.path.join(run_folder, 'predictions', 'mean_%dif_RF.txt'), 'w') as f:
+        f.write(mean_dif_RF_result)
+
+    #rmse for RF
+    rmse_RF = np.sqrt(mean_squared_error(truth, predictions_RF))
+    rmse_RF_result = str(rmse_RF)
+    with open(os.path.join(run_folder, 'predictions', 'rmse_RF.txt'), 'w') as f:
+        f.write(rmse_RF_result)
+
+    #mae for RF
+    mae_RF = mean_absolute_error(truth, predictions_RF)
+    mae_RF_result = str(mae_RF)
+    with open(os.path.join(run_folder, 'predictions', 'mae_RF.txt'), 'w') as f:
+        f.write(mae_RF_result)
 
     # accuracy metrics NN
     mean_dif_NN = predictions_NN / truth * 100 - 100
@@ -126,13 +149,69 @@ def main():
     # # other accuracy measures like MAE enz
 
 
-    # # build plots actuals vs predicted
+    # # build plots actuals vs predicted 
+    #plot RF scatter
+    fig = plt.figure()
+    plt.scatter(predictions_RF, truth, alpha=0.2)
+    plt.xlabel('Random Forest Predictions')
+    plt.ylabel('True Values')
+    lims = [0, 800000]
+    plt.xlim(lims)
+    plt.ylim(lims)
+    _ = plt.plot(lims, lims)
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'RF scatter.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
 
-    # # save to disk best_model as pickle in model folder, accuracy metrics
+    #plots error RF
+    error = predictions_RF - truth
+    fig = plt.figure()
+    plt.hist(error, bins = 30)
+    plt.xlabel("Absolute Prediction Error for Random Forest")
+    plt.ylabel("Count")
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'RF error.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
 
-    # # in log folder, plots in log folder
 
+    #plot NN scatter
+    fig = plt.figure()
+    plt.scatter(predictions_NN, truth, alpha=0.2)
+    plt.xlabel('NN predictions')
+    plt.ylabel('True Values')
+    lims = [0, 800000]
+    plt.xlim(lims)
+    plt.ylim(lims)
+    _ = plt.plot(lims, lims)
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'NN scatter.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
+
+
+    #plot NN error
+    error = predictions_NN - truth
+    fig = plt.figure()
+    plt.hist(error, bins = 30)
+    plt.xlabel("Absolute Prediction Error for Random Forest")
+    plt.ylabel("Count")
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'NN error.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
+
+
+    run_id_end_time = datetime.datetime.now()
+    print(f'Ended run at time: {run_id_end_time}')
+    total_runtime = run_id_end_time - run_id_start_time
+    total_runtime = str(total_runtime)
+    with open(os.path.join(run_folder, 'logs', 'total runtime.txt'), 'w') as f:
+        f.write(total_runtime)
+    print(f'Total run time: {total_runtime}')
     print('Pipeline completed')
+
 
 if __name__ == "__main__":
     main()
