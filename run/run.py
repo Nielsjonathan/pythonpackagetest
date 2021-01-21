@@ -21,6 +21,7 @@ from modules.clean import DataCleaner
 from modules.validation import DataPartitioner
 from modules.featurizing import Featurizer
 from modules.hypertuning import Hypertuner
+from modules.hypertuningTTS import HypertunerTTS
 
 def main():
     #saving the run time as id
@@ -82,6 +83,34 @@ def main():
     hypertuner_NN = Hypertuner(estimator = MLPRegressor(random_state=1234),
     tuning_params = conf["training_params"]["hypertuning"]["NN_params"],
     validation_mapping = validation_mapping)
+
+
+    ########## test tts #########################################################################
+    hypertuner_rf_tts = HypertunerTTS(estimator = RandomForestRegressor(random_state=1234),
+    tuning_params = conf["training_params"]["hypertuning"]["RF_params"],
+    validation_mapping = validation_mapping)
+
+    ### model rf sellingtime ###
+    best_model_rf_tts, best_model_params_tts = hypertuner_rf_tts.tune_model(train_set)
+
+    # predict on test set with RF
+    test_set = featurized_data.merge(validation_mapping.query("test == True")[['globalId', 'cv_split']])
+    truth = test_set.sellingtime
+    test_set.drop(columns=['sellingtime', 'globalId', 'cv_split'], inplace = True) 
+    predictions_RF_tts = best_model_rf_tts.predict(test_set)
+
+    #rmse for RF tts
+    rmse_RF_tts = np.sqrt(mean_squared_error(truth, predictions_RF_tts))
+    rmse_RF_tts_result = str(rmse_RF_tts)
+    with open(os.path.join(run_folder, 'predictions', 'rmse_RF.txt'), 'w') as f:
+        f.write(rmse_RF_tts_result)
+
+    #mae for RF tts
+    mae_RF_tts = mean_absolute_error(truth, predictions_RF_tts)
+    mae_RF_tts_result = str(mae_RF_tts)
+    with open(os.path.join(run_folder, 'predictions', 'mae_RF.txt'), 'w') as f:
+        f.write(mae_RF_tts_result)
+    ########## end test tts #########################################################################
 
     print('Training models')
 
