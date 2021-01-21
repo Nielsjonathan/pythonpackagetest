@@ -47,10 +47,12 @@ def main():
         json.dump(conf, f)
 
     #load the data
+    print('Loading data')
     data_loader = DataLoader(conf['base_folder'] + 'raw')
     houses, codes, services, infrastructure, leisure = data_loader.load_data()
 
     #clean the data
+    print('Cleaning data')
     data_cleaner = DataCleaner()
     houses, codes, services, infrastructure, leisure = data_cleaner.clean_data(houses, codes, services, infrastructure, leisure)
 
@@ -70,142 +72,198 @@ def main():
     featurized_data = Featurizer(houses).transform(houses, codes, services, infrastructure, leisure)
     featurized_data.reset_index(drop=True).to_feather(os.path.join(run_folder, "prepared", "features.feather"))
 
-    #hypertuning the model 
+    ########## RF sellingprice ######################################################
+
+    #hypertuning RF sellingprice 
+    print('Training models')
+
+    print('Training RF model for sellingprice')
+    
     train_set = featurized_data.merge(validation_mapping.query("test == False")[['globalId', 'cv_split']])
     
     hypertuner_rf = Hypertuner(estimator = RandomForestRegressor(random_state=1234),
-    tuning_params = conf["training_params"]["hypertuning"]["RF_params"],
+    tuning_params = conf["training_params"]["hypertuning"]["RF_params"]["RF_sellingprice"], #add extra settings branch
     validation_mapping = validation_mapping)
 
-    hypertuner_NN = Hypertuner(estimator = MLPRegressor(random_state=1234),
-    tuning_params = conf["training_params"]["hypertuning"]["NN_params"],
+    #model RF sellingprice
+    best_model_RF_sellingprice, best_model_params_RF_sellingprice = hypertuner_rf.tune_model(train_set)
+    print(f'Best model parameters: {best_model_params_RF_sellingprice}')
+
+    # log best parameters RF sellingprice
+    with open(os.path.join(run_folder, 'logs', 'best_model_params_RF_sellingprice.txt'), 'w') as f:
+        f.write(json.dumps(best_model_params_RF_sellingprice))
+
+    # predict sellingprice on test set with RF
+    test_set = featurized_data.merge(validation_mapping.query("test == True")[['globalId', 'cv_split']])
+    truth = test_set.sellingPrice
+    test_set.drop(columns=['sellingPrice', 'globalId', 'cv_split'], inplace = True) 
+    predictions_RF_sellingprice = best_model_RF_sellingprice.predict(test_set)
+
+    # save RF sellingprice to disk
+    pickle.dump(best_model_RF_sellingprice, open(os.path.join(run_folder, 'models', 'best_model_RF_sellingprice{}.sav'.format(str(best_model_params_RF_sellingprice))), 'wb'))
+    
+    # accuracy metrics RF sellingprice
+
+    #mean percentage difference between truth and prediction RF sellingprice
+    dif_RF_sellingprice = predictions_RF_sellingprice / truth * 100 - 100
+    mean_dif_RF_sellingprice = np.mean(dif_RF_sellingprice)
+    mean_dif_RF_sellingprice_result = str(mean_dif_RF_sellingprice)
+    with open(os.path.join(run_folder, 'predictions', 'mean_%dif_RF_sellingprice.txt'), 'w') as f:
+        f.write(mean_dif_RF_sellingprice_result)
+
+    #rmse for RF sellingprice
+    rmse_RF_sellingprice = np.sqrt(mean_squared_error(truth, predictions_RF_sellingprice))
+    rmse_RF_sellingprice_result = str(rmse_RF_sellingprice)
+    with open(os.path.join(run_folder, 'predictions', 'rmse_RF_sellingprice.txt'), 'w') as f:
+        f.write(rmse_RF_sellingprice_result)
+
+    #mae for RF sellingprice
+    mae_RF_sellingprice = mean_absolute_error(truth, predictions_RF_sellingprice)
+    mae_RF_sellingprice_result = str(mae_RF_sellingprice)
+    with open(os.path.join(run_folder, 'predictions', 'mae_RF_sellingprice.txt'), 'w') as f:
+        f.write(mae_RF_sellingprice_result)   
+
+    #plot RF sellingprice scatter
+    fig = plt.figure()
+    plt.scatter(predictions_RF_sellingprice, truth, alpha=0.2)
+    plt.xlabel('Random Forest Predictions Sellingprice')
+    plt.ylabel('True Values')
+    lims = [0, 800000]
+    plt.xlim(lims)
+    plt.ylim(lims)
+    _ = plt.plot(lims, lims)
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'RF sellingprice scatter.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
+
+    #plots error RF sellingprice
+    error = predictions_RF_sellingprice - truth
+    fig = plt.figure()
+    plt.hist(error, bins = 30)
+    plt.xlabel("Absolute Prediction Error for Random Forest Sellingprice")
+    plt.ylabel("Count")
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'RF sellingprice error.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
+    
+    print('Finished RF model for sellingprice')
+    
+    ########## RF sellingtime ####################################################
+
+    print('Training RF model for sellingtime')
+
+    hypertuner_RF_tts = HypertunerTTS(estimator = RandomForestRegressor(random_state=1234),
+    tuning_params = conf["training_params"]["hypertuning"]["RF_params"]["RF_sellingtime"],
     validation_mapping = validation_mapping)
 
+    #model RF sellingtime
+    best_model_RF_sellingtime, best_model_params_RF_sellingtime = hypertuner_RF_tts.tune_model(train_set)
+    print(f'Best model parameters: {best_model_params_RF_sellingtime}')
 
-    ########## test tts #########################################################################
-    hypertuner_rf_tts = HypertunerTTS(estimator = RandomForestRegressor(random_state=1234),
-    tuning_params = conf["training_params"]["hypertuning"]["RF_params"],
-    validation_mapping = validation_mapping)
+    # log best parameters RF sellingtime
+    with open(os.path.join(run_folder, 'logs', 'best_model_params_RF_sellingtime.txt'), 'w') as f:
+        f.write(json.dumps(best_model_params_RF_sellingtime))
 
-    ### model rf sellingtime ###
-    best_model_rf_tts, best_model_params_tts = hypertuner_rf_tts.tune_model(train_set)
-
-    # predict on test set with RF
+    # predict on test set with RF sellingtime
     test_set = featurized_data.merge(validation_mapping.query("test == True")[['globalId', 'cv_split']])
     truth = test_set.sellingtime
     test_set.drop(columns=['sellingtime', 'globalId', 'cv_split'], inplace = True) 
-    predictions_RF_tts = best_model_rf_tts.predict(test_set)
+    predictions_RF_sellingtime = best_model_RF_sellingtime.predict(test_set)
+
+    # save RF sellingtime to disk
+    pickle.dump(best_model_RF_sellingtime, open(os.path.join(run_folder, 'models', 'best_model_RF_sellingtime{}.sav'.format(str(best_model_params_RF_sellingtime))), 'wb'))
 
     #rmse for RF tts
-    rmse_RF_tts = np.sqrt(mean_squared_error(truth, predictions_RF_tts))
-    rmse_RF_tts_result = str(rmse_RF_tts)
-    with open(os.path.join(run_folder, 'predictions', 'rmse_RF.txt'), 'w') as f:
-        f.write(rmse_RF_tts_result)
+    rmse_RF_sellingtime = np.sqrt(mean_squared_error(truth, predictions_RF_sellingtime))
+    rmse_RF_sellingtime_result = str(rmse_RF_sellingtime)
+    with open(os.path.join(run_folder, 'predictions', 'rmse_RF_sellingtime.txt'), 'w') as f:
+        f.write(rmse_RF_sellingtime_result)
 
     #mae for RF tts
-    mae_RF_tts = mean_absolute_error(truth, predictions_RF_tts)
-    mae_RF_tts_result = str(mae_RF_tts)
-    with open(os.path.join(run_folder, 'predictions', 'mae_RF.txt'), 'w') as f:
-        f.write(mae_RF_tts_result)
-    ########## end test tts #########################################################################
+    mae_RF_sellingtime = mean_absolute_error(truth, predictions_RF_sellingtime)
+    mae_RF_sellingtime_result = str(mae_RF_sellingtime)
+    with open(os.path.join(run_folder, 'predictions', 'mae_RF_sellingtime.txt'), 'w') as f:
+        f.write(mae_RF_sellingtime_result)
 
-    print('Training models')
+    #plot RF sellingtime scatter
+    fig = plt.figure()
+    plt.scatter(predictions_RF_sellingtime, truth, alpha=0.2)
+    plt.xlabel('Random Forest Predictions sellingtime')
+    plt.ylabel('True Values')
+    lims_x = [0, 200]
+    lims_y = [0, 500]
+    plt.xlim(lims_x)
+    plt.ylim(lims_y)
+    _ = plt.plot(lims, lims)
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'RF sellingtime scatter.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
 
-    #model RF
-    #train_set = featurized_data.merge(validation_mapping.query("test == False")[['globalId', 'cv_split']])
-    best_model_RF, best_model_params_RF = hypertuner_rf.tune_model(train_set)
+    #plots error RF sellingtime
+    error = predictions_RF_sellingtime - truth
+    fig = plt.figure()
+    plt.hist(error, bins = 30)
+    plt.xlabel("Absolute Prediction Error for Random Forest sellingtime")
+    plt.ylabel("Count")
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'RF sellingtime error.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
+
+    print('Finished RF model for sellingtime')
+
+    ########### NN sellingprice ##############################################################
+
+    print('Training NN model for sellingprice')
+
+    hypertuner_NN = Hypertuner(estimator = MLPRegressor(random_state=1234),
+    tuning_params = conf["training_params"]["hypertuning"]["NN_params"]["NN_sellingprice"],
+    validation_mapping = validation_mapping)
 
     #model NN
-    best_model_NN, best_model_params_NN = hypertuner_NN.tune_model(train_set)
-
-    # log best parameters RF
-    with open(os.path.join(run_folder, 'logs', 'best_model_params_RF_sellingprice.txt'), 'w') as f:
-        f.write(json.dumps(best_model_params_RF))
+    best_model_NN_sellingprice, best_model_params_NN_sellingprice = hypertuner_NN.tune_model(train_set)
+    print(f'Best model parameters: {best_model_params_NN_sellingprice}')
 
     # log best parameters NN
     with open(os.path.join(run_folder, 'logs', 'best_model_params_NN_sellingprice.txt'), 'w') as f:
-        f.write(json.dumps(best_model_params_NN))
+        f.write(json.dumps(best_model_params_NN_sellingprice))
 
-    # predict on test set with RF
+    # predict on test set with NN sellingprice
     test_set = featurized_data.merge(validation_mapping.query("test == True")[['globalId', 'cv_split']])
     truth = test_set.sellingPrice
     test_set.drop(columns=['sellingPrice', 'globalId', 'cv_split'], inplace = True) 
-    predictions_RF = best_model_RF.predict(test_set)
+    predictions_NN_sellingprice = best_model_NN_sellingprice.predict(test_set)
 
-    # predict on test set with NN
-    test_set = featurized_data.merge(validation_mapping.query("test == True")[['globalId', 'cv_split']])
-    truth = test_set.sellingPrice
-    test_set.drop(columns=['sellingPrice', 'globalId', 'cv_split'], inplace = True) 
-    predictions_NN = best_model_NN.predict(test_set)
-
-    # save RF to disk
-    pickle.dump(best_model_RF, open(os.path.join(run_folder, 'models', 'best_model_RF_sellingprice{}.sav'.format(str(best_model_params_RF))), 'wb'))
-
-    # save NN to disk
-    pickle.dump(best_model_NN, open(os.path.join(run_folder, 'models', 'best_model_NN_sellingprice{}.sav'.format(str(best_model_NN))), 'wb'))
-
-    # accuracy metrics RF
-    #mean percentage difference between truth and prediction
-    dif_RF = predictions_RF / truth * 100 - 100
-    mean_dif_RF = np.mean(dif_RF)
-    mean_dif_RF_result = str(mean_dif_RF)
-    with open(os.path.join(run_folder, 'predictions', 'mean_%dif_RF.txt'), 'w') as f:
-        f.write(mean_dif_RF_result)
-
-    #rmse for RF
-    rmse_RF = np.sqrt(mean_squared_error(truth, predictions_RF))
-    rmse_RF_result = str(rmse_RF)
-    with open(os.path.join(run_folder, 'predictions', 'rmse_RF.txt'), 'w') as f:
-        f.write(rmse_RF_result)
-
-    #mae for RF
-    mae_RF = mean_absolute_error(truth, predictions_RF)
-    mae_RF_result = str(mae_RF)
-    with open(os.path.join(run_folder, 'predictions', 'mae_RF.txt'), 'w') as f:
-        f.write(mae_RF_result)
+    # save NN sellingpriceto disk
+    pickle.dump(best_model_NN_sellingprice, open(os.path.join(run_folder, 'models', 'best_model_NN_sellingtime{}.sav'.format(str(best_model_NN_sellingprice))), 'wb'))
 
     # accuracy metrics NN
-    mean_dif_NN = predictions_NN / truth * 100 - 100
-    np.mean(mean_dif_NN)
+    #mean percentage difference between truth and prediction RF sellingprice
+    dif_NN_sellingprice = predictions_NN_sellingprice / truth * 100 - 100
+    mean_dif_NN_sellingprice = np.mean(dif_NN_sellingprice)
+    mean_dif_NN_sellingprice_result = str(mean_dif_NN_sellingprice)
+    with open(os.path.join(run_folder, 'predictions', 'mean_%dif_NN_sellingprice.txt'), 'w') as f:
+        f.write(mean_dif_NN_sellingprice_result)
 
+    #rmse for RF sellingprice
+    rmse_NN_sellingprice = np.sqrt(mean_squared_error(truth, predictions_NN_sellingprice))
+    rmse_NN_sellingprice_result = str(rmse_NN_sellingprice)
+    with open(os.path.join(run_folder, 'predictions', 'rmse_NN_sellingprice.txt'), 'w') as f:
+        f.write(rmse_NN_sellingprice_result)
 
-    # # calculate accuracy and build plots
-    # # calculate rmse on test set using predictions_test and actuals
-    # rmse_test = None # filled
-    # # other accuracy measures like MAE enz
-
-
-    # # build plots actuals vs predicted 
-    #plot RF scatter
-    fig = plt.figure()
-    plt.scatter(predictions_RF, truth, alpha=0.2)
-    plt.xlabel('Random Forest Predictions')
-    plt.ylabel('True Values')
-    lims = [0, 800000]
-    plt.xlim(lims)
-    plt.ylim(lims)
-    _ = plt.plot(lims, lims)
-    plt.show()
-    graph_path = (os.path.join(run_folder, 'logs'))
-    graph_file = 'RF scatter.png'
-    fig.savefig(os.path.join(graph_path, graph_file))
-
-    #plots error RF
-    error = predictions_RF - truth
-    fig = plt.figure()
-    plt.hist(error, bins = 30)
-    plt.xlabel("Absolute Prediction Error for Random Forest")
-    plt.ylabel("Count")
-    plt.show()
-    graph_path = (os.path.join(run_folder, 'logs'))
-    graph_file = 'RF error.png'
-    fig.savefig(os.path.join(graph_path, graph_file))
-
+    #mae for RF sellingprice
+    mae_NN_sellingprice = mean_absolute_error(truth, predictions_NN_sellingprice)
+    mae_NN_sellingprice_result = str(mae_NN_sellingprice)
+    with open(os.path.join(run_folder, 'predictions', 'mae_NN_sellingprice.txt'), 'w') as f:
+        f.write(mae_NN_sellingprice_result)
 
     #plot NN scatter
     fig = plt.figure()
-    plt.scatter(predictions_NN, truth, alpha=0.2)
-    plt.xlabel('NN predictions')
+    plt.scatter(predictions_NN_sellingprice, truth, alpha=0.2)
+    plt.xlabel('NN sellingprice predictions')
     plt.ylabel('True Values')
     lims = [0, 800000]
     plt.xlim(lims)
@@ -213,21 +271,88 @@ def main():
     _ = plt.plot(lims, lims)
     plt.show()
     graph_path = (os.path.join(run_folder, 'logs'))
-    graph_file = 'NN scatter.png'
+    graph_file = 'NN sellingprice scatter.png'
     fig.savefig(os.path.join(graph_path, graph_file))
 
-
     #plot NN error
-    error = predictions_NN - truth
+    error = predictions_NN_sellingprice - truth
     fig = plt.figure()
     plt.hist(error, bins = 30)
-    plt.xlabel("Absolute Prediction Error for Random Forest")
+    plt.xlabel("Absolute Prediction Error for NN sellingprice")
     plt.ylabel("Count")
     plt.show()
     graph_path = (os.path.join(run_folder, 'logs'))
-    graph_file = 'NN error.png'
+    graph_file = 'NN sellingprice error.png'
     fig.savefig(os.path.join(graph_path, graph_file))
 
+    print('Finished NN model for sellingtime')
+
+    ############# NN sellingtime ##########################################################
+
+    print('Training NN model for sellingtime')
+
+    hypertuner_NN_tts = HypertunerTTS(estimator = MLPRegressor(random_state=1234),
+    tuning_params = conf["training_params"]["hypertuning"]["NN_params"]["NN_sellingtime"],
+    validation_mapping = validation_mapping)
+
+    #model NN sellingtime
+    best_model_NN_sellingtime, best_model_params_NN_sellingtime = hypertuner_NN_tts.tune_model(train_set)
+    print(f'Best model parameters: {best_model_params_NN_sellingtime}')
+
+    # log best parameters NN sellingtime
+    with open(os.path.join(run_folder, 'logs', 'best_model_params_NN_sellingtime.txt'), 'w') as f:
+        f.write(json.dumps(best_model_params_NN_sellingtime))
+
+    # predict on test set with NN sellingtime
+    test_set = featurized_data.merge(validation_mapping.query("test == True")[['globalId', 'cv_split']])
+    truth = test_set.sellingtime
+    test_set.drop(columns=['sellingtime', 'globalId', 'cv_split'], inplace = True) 
+    predictions_NN_sellingtime = best_model_NN_sellingtime.predict(test_set)
+
+    # save NN sellingtime to disk
+    pickle.dump(best_model_NN_sellingtime, open(os.path.join(run_folder, 'models', 'best_model_NN_sellingtime{}.sav'.format(str(best_model_params_NN_sellingtime))), 'wb'))
+
+    #rmse for NN sellingtime
+    rmse_NN_sellingtime = np.sqrt(mean_squared_error(truth, predictions_NN_sellingtime))
+    rmse_NN_sellingtime_result = str(rmse_NN_sellingtime)
+    with open(os.path.join(run_folder, 'predictions', 'rmse_NN_sellingtime.txt'), 'w') as f:
+        f.write(rmse_NN_sellingtime_result)
+
+    #mae for NN sellingtime
+    mae_NN_sellingtime = mean_absolute_error(truth, predictions_NN_sellingtime)
+    mae_NN_sellingtime_result = str(mae_NN_sellingtime)
+    with open(os.path.join(run_folder, 'predictions', 'mae_NN_sellingtime.txt'), 'w') as f:
+        f.write(mae_NN_sellingtime_result)
+
+    #plot NN sellingtime scatter
+    fig = plt.figure()
+    plt.scatter(predictions_NN_sellingtime, truth, alpha=0.2)
+    plt.xlabel('NN Predictions sellingtime')
+    plt.ylabel('True Values')
+    lims_x = [0, 200]
+    lims_y = [0, 500]
+    plt.xlim(lims_x)
+    plt.ylim(lims_y)
+    _ = plt.plot(lims, lims)
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'NN sellingtime scatter.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
+
+    #plots error NN sellingtime
+    error = predictions_RF_sellingtime - truth
+    fig = plt.figure()
+    plt.hist(error, bins = 30)
+    plt.xlabel("Absolute Prediction Error for NN sellingtime")
+    plt.ylabel("Count")
+    plt.show()
+    graph_path = (os.path.join(run_folder, 'logs'))
+    graph_file = 'NN sellingtime error.png'
+    fig.savefig(os.path.join(graph_path, graph_file))
+
+    print('Finished NN model for sellingtime')
+
+    ###### all models finished
 
     run_id_end_time = datetime.datetime.now()
     print(f'Ended run at time: {run_id_end_time}')
