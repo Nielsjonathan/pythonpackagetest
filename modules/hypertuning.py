@@ -75,4 +75,3 @@ class Hypertuner(object):
         final_estimator = self.estimator.set_params(**best_parameters)
         final_estimator.fit(X=train_set_model, y=train_set[self.target])
         return final_estimator, best_parameters
-
