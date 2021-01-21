@@ -7,12 +7,12 @@
         "hypertuning": {
             "RF_params": {
                 "RF_sellingprice": {
-                    "n_estimators": [5],
-                    "max_depth": [2, 4]
+                    "n_estimators": [20, 40],
+                    "max_depth": [8, 10, 12]
                 },
                 "RF_sellingtime": {
-                    "n_estimators": [10],
-                    "max_depth": [2,4]
+                    "n_estimators": [10, 20],
+                    "max_depth": [4, 6, 8]
                 }
             },
             "NN_params": {
