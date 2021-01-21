@@ -48,8 +48,6 @@ def main():
 
     #load the data
     data_loader = DataLoader(conf['base_folder'] + 'raw')
-    #houses = data_loader.load_data()
-    #final 
     houses, codes, services, infrastructure, leisure = data_loader.load_data()
 
     #clean the data
@@ -65,12 +63,11 @@ def main():
     print("Data loaded and cleaned")
 
     #create train and test
-    validation_mapping = DataPartitioner().partition_data(houses)
+    validation_mapping = DataPartitioner(test_perc= conf['training_params']['test_perc']).partition_data(houses)
     validation_mapping.to_feather(os.path.join(run_folder, "prepared", "validation_mapping.feather"))
 
     #featurize the data
     featurized_data = Featurizer(houses).transform(houses, codes, services, infrastructure, leisure)
-    # featurized_data = transform(houses, codes, services, infrastructure, leisure)
     featurized_data.reset_index(drop=True).to_feather(os.path.join(run_folder, "prepared", "features.feather"))
 
     #hypertuning the model 

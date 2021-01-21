@@ -12,5 +12,3 @@ class DataLoader(object):
         infrastructure = pd.read_csv(os.path.join(self.raw_folder, 'infrastructure.csv'),sep=";")
         leisure = pd.read_csv(os.path.join(self.raw_folder, 'leisure.csv'),sep=";")
         return houses, codes, services, infrastructure, leisure
-
-#self = DataLoader(raw_folder=os.path.join(conf['base_folder'] + 'raw'))

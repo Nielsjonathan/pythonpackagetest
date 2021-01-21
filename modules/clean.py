@@ -7,10 +7,12 @@ class DataCleaner(object):
         self.cleaning_statistics = {}
 
     def clean_data(self, houses, codes, services, infrastructure, leisure) -> list:
+
+        ##### CLEAN HOUSES ########
         
         # delete globalId.1 and change columns names
         del houses['globalId.1']
-
+        
         houses.columns = ['globalId', 'publicationDate', 'zipcode', 'sellingPrice', 'description', 'houseType', 
         'categoryObject', 'constructionYear', 'garden', 'parcel', 'office', 'rooms', 'bathrooms', 
         'energyLabel', 'livingArea', 'signDate']
@@ -218,6 +220,4 @@ class DataCleaner(object):
         leisure['Vrije tijd en cultuur/Bioscoop/Aantal bioscopen/Binnen 20 km (aantal)'] = leisure['Vrije tijd en cultuur/Bioscoop/Aantal bioscopen/Binnen 20 km (aantal)'].replace(np.NaN, leisure['Vrije tijd en cultuur/Bioscoop/Aantal bioscopen/Binnen 20 km (aantal)'].mean())
 
 
-        return houses, codes, services, infrastructure, leisure 
-    
-#self = DataCleaner()
+        return houses, codes, services, infrastructure, leisure

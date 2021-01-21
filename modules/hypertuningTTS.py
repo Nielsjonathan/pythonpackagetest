@@ -16,7 +16,6 @@ class HypertunerTTS(object):
         self.target = target
 
     def calculate_mean_cv_error(self, train_set, estimator_cv):
-        # now perform cross validation fitting for each split
         splits = train_set['cv_split'].unique().tolist()
         splits.sort()
 
@@ -25,27 +24,18 @@ class HypertunerTTS(object):
         for i in splits:
             train_split = train_set.query(f"cv_split != {i}")
             X_train = train_split.drop(['globalId', 'sellingtime', 'cv_split'],axis=1)
-            # print(X_train.columns)
             y_train = train_split['sellingtime']
             estimator_cv.fit(X=X_train, y = y_train)
-            # evaluate the model on split 1
             test_obs = train_set.query(f"cv_split == {i}")
             X_test = test_obs.drop(['globalId', 'sellingtime', 'cv_split'],axis=1)
             y_test = test_obs['sellingtime']
             y_pred = estimator_cv.predict(X_test)
-            # calculate error measure on this fold for the estimator with the
-            # given parameters
             rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-            #rmse = np.sqrt(np.sum(np.square(X_test['sellingPrice'] - y_pred))/X_test.shape[0])
-            #np.sqrt(mean_squared_error(X_test['sellingPrice'], y_pred))
             cv_errors.append(rmse)
         mean_rmse = np.mean(cv_errors)
         return mean_rmse
 
     def tune_model(self, train_set):
-        '''Perform the hypertuning of the estimator on the train set
-        for all the combinations of the hyperparameters
-        '''
         parameter_combos = []
         parameter_combos_dicts = []
 
@@ -60,6 +50,7 @@ class HypertunerTTS(object):
 
         validation_mapping_train = self.validation_mapping.query("test == False")
         train_set = train_set.merge(validation_mapping_train[['globalId', 'cv_split']])
+        
         # the cv errors for each parameter combo inside paramter_combos_dict
         cv_errors = []
         best_rmse = 1000000000
@@ -76,28 +67,11 @@ class HypertunerTTS(object):
                 best_parameters = d
                 best_rmse = mean_cv_error
 
-        #return best_parameters, best_rmse
-
-
-
-        
-        # get the best parameter combo out of the lot
-        #best_parameters = {'n_estimators': 40, 'max_depth': 12} # needs to be replaced with the best parameter combo i.e. with smallers cv error value
-
+        # creating train set
         train_set_model = train_set.drop(columns=['sellingtime', 'globalId', 'cv_split'])
 
         # train the best model on all train set
         final_estimator = deepcopy(self.estimator)
         final_estimator = self.estimator.set_params(**best_parameters)
-        final_estimator.fit(X=train_set_model, y=train_set[self.target]) # check that the columns are righjt
+        final_estimator.fit(X=train_set_model, y=train_set[self.target])
         return final_estimator, best_parameters
-
-
-# estimator = RandomForestRegressor(random_state=1234)
-# tuning_params = conf["training_params"]["hypertuning"]["RF_params"]
-# validation_mapping = validation_mapping
-
-# self = Hypertuner(estimator = RandomForestRegressor(random_state=1234),
-# tuning_params = conf["training_params"]["hypertuning"]["RF_params"],
-# validation_mapping = validation_mapping)
-

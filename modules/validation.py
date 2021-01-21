@@ -2,18 +2,16 @@ import pandas as pd
 import numpy as np
 
 class DataPartitioner(object):
-    '''Class to partition data into train and test,
-    and to partition test into 5-fold cross validation splits.
-    '''
-    def __init__(self, perc_test = 0.2, train_cv_splits = 5, seed = 1235):
-        self.perc_test = perc_test
+
+    def __init__(self, test_perc, train_cv_splits = 5, seed = 1235):
+        self.test_perc = test_perc
         self.train_cv_splits = train_cv_splits
         self.seed = seed
 
     def partition_data(self, houses):
         obs = houses[['globalId']].copy()
         obs = obs.sort_values(['globalId'])
-        obs_test = obs.sample(frac=self.perc_test, random_state = self.seed).copy()
+        obs_test = obs.sample(frac =self.test_perc, random_state = self.seed).copy()
         obs_test = obs_test.assign(test = True).assign(cv_split=np.nan)
 
         obs_train = (
@@ -25,5 +23,3 @@ class DataPartitioner(object):
         obs_train = obs_train.assign(cv_split = cv_splits)
         final_obs = pd.concat([obs_test, obs_train]).reset_index(drop=True)
         return final_obs
-
-#self = DataPartitioner()
